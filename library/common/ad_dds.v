@@ -69,6 +69,9 @@ module ad_dds #(
   );
 
   wire [DDS_DW*CLK_RATIO-1:0] dac_dds_data_s;
+  wire                        sync_pulse;
+
+  reg                         dac_data_sync_m = 1'd0;
 
   always @(posedge clk) begin
     dac_dds_data <= dac_dds_data_s;
@@ -89,6 +92,12 @@ module ad_dds #(
       reg  [PHASE_DW-1:0]  dac_dds_incr_1 = 'd0;
 
       always @(posedge clk) begin
+        dac_data_sync_m <= dac_data_sync;
+      end
+
+      assign sync_pulse = ~dac_data_sync_m & dac_data_sync;
+
+      always @(posedge clk) begin
         dac_dds_incr_0 <= tone_1_freq_word * CLK_RATIO;
         dac_dds_incr_1 <= tone_2_freq_word * CLK_RATIO;
       end
@@ -96,17 +105,27 @@ module ad_dds #(
       //  phase accumulator
       for (i=1; i <= CLK_RATIO; i=i+1) begin: dds_phase
         always @(posedge clk) begin
-          if (dac_data_sync == 1'b1) begin
-            if (i == 1) begin
-              dac_dds_phase_0[1] <= tone_1_init_offset;
-              dac_dds_phase_1[1] <= tone_2_init_offset;
-            end else if (CLK_RATIO > 1)begin
-              dac_dds_phase_0[i] <= dac_dds_phase_0[i-1] + tone_1_freq_word;
-              dac_dds_phase_1[i] <= dac_dds_phase_1[i-1] + tone_2_freq_word;
+          if (dac_valid == 1'b1) begin
+            if (sync_pulse == 1'b1) begin
+              if (i == 1) begin
+                dac_dds_phase_0[1] <= tone_1_init_offset;
+                dac_dds_phase_1[1] <= tone_2_init_offset;
+              end else if (CLK_RATIO > 1)begin
+                dac_dds_phase_0[i] <= dac_dds_phase_0[i-1] + tone_1_freq_word;
+                dac_dds_phase_1[i] <= dac_dds_phase_1[i-1] + tone_2_freq_word;
+              end
+            end else if (dac_data_sync == 1'b1) begin
+              if (i == 1) begin
+                dac_dds_phase_0[1] <= 'd0;
+                dac_dds_phase_1[1] <= 'd0;
+              end else if (CLK_RATIO > 1)begin
+                dac_dds_phase_0[i] <= 'd0;
+                dac_dds_phase_1[i] <= 'd0;
+              end
+            end else if (dac_data_sync == 1'b0) begin
+              dac_dds_phase_0[i] <= dac_dds_phase_0[i] + dac_dds_incr_0;
+              dac_dds_phase_1[i] <= dac_dds_phase_1[i] + dac_dds_incr_1;
             end
-          end else if (dac_valid == 1'b1) begin
-            dac_dds_phase_0[i] <= dac_dds_phase_0[i] + dac_dds_incr_0;
-            dac_dds_phase_1[i] <= dac_dds_phase_1[i] + dac_dds_incr_1;
           end
         end
 
