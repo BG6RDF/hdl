@@ -53,4 +53,7 @@ XILINX_DEPS += axi_adrv9001_ip.tcl
 
 XILINX_LIB_DEPS += util_cdc
 
+INTEL_DEPS += intel/adrv9001_rx.v
+INTEL_DEPS += axi_adrv9001_hw.tcl
+
 include ../scripts/library.mk
